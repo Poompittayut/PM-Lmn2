@@ -155,8 +155,10 @@ th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacin
 <div class="login-overlay" id="login-overlay">
   <div class="login-card">
     <div class="login-title">เข้าสู่ระบบ PM LMN2</div>
-    <div class="login-sub">กรอกชื่อช่างที่จะใช้บันทึกข้อมูล</div>
-    <input type="text" class="login-input" id="login-input" placeholder="เช่น ช่างA, นายสมชาย" autofocus />
+    <div class="login-sub">กรอกชื่อช่าง และรหัสผ่านเพื่อเข้าใช้งาน</div>
+    <input type="text" class="login-input" id="login-input" placeholder="ชื่อช่าง เช่น ช่างA, นายสมชาย" autofocus />
+    <input type="password" class="login-input" id="login-pass" placeholder="รหัสผ่าน" />
+    <div id="login-err" style="display:none;color:#d42020;font-size:11px;margin:-8px 0 10px">รหัสผ่านไม่ถูกต้อง</div>
     <button class="login-btn" id="login-btn">เริ่มใช้งาน</button>
   </div>
 </div>
@@ -688,29 +690,48 @@ document.getElementById("reset-filter").onclick = () => {
 };
 
 /*** Login ***/
+const APP_PASSWORD = "lmn1234";
 function showLogin(){
   document.getElementById("login-overlay").classList.remove("hidden");
   document.getElementById("login-input").value = STATE.technician || "";
+  document.getElementById("login-pass").value = "";
+  document.getElementById("login-err").style.display = "none";
   document.getElementById("login-input").focus();
 }
 function hideLogin(){ document.getElementById("login-overlay").classList.add("hidden"); }
 function doLogin(){
   const v = document.getElementById("login-input").value.trim();
-  if (!v) return;
+  const p = document.getElementById("login-pass").value;
+  const err = document.getElementById("login-err");
+  if (!v) { document.getElementById("login-input").focus(); return; }
+  if (p !== APP_PASSWORD){
+    err.textContent = "รหัสผ่านไม่ถูกต้อง";
+    err.style.display = "block";
+    document.getElementById("login-pass").focus();
+    document.getElementById("login-pass").select();
+    return;
+  }
   STATE.technician = v;
   localStorage.setItem("pm_tech", v);
+  localStorage.setItem("pm_auth", "1");
   document.getElementById("sb-user-name").textContent = v;
   hideLogin();
   reload();
 }
 document.getElementById("login-btn").onclick = doLogin;
-document.getElementById("login-input").onkeydown = (e) => { if (e.key==="Enter") doLogin(); };
-document.getElementById("sb-logout").onclick = showLogin;
+document.getElementById("login-input").onkeydown = (e) => { if (e.key==="Enter") document.getElementById("login-pass").focus(); };
+document.getElementById("login-pass").onkeydown = (e) => { if (e.key==="Enter") doLogin(); };
+document.getElementById("sb-logout").onclick = () => {
+  localStorage.removeItem("pm_auth");
+  localStorage.removeItem("pm_tech");
+  STATE.technician = "";
+  showLogin();
+};
 
 /*** Init ***/
 initYearMonth();
 document.getElementById("sb-counter").textContent = `${MASTER.machines.length} เครื่อง · ${MASTER.tasks.length} งาน`;
-if (STATE.technician){
+if (STATE.technician && localStorage.getItem("pm_auth") === "1"){
   document.getElementById("sb-user-name").textContent = STATE.technician;
   hideLogin();
   reload();
