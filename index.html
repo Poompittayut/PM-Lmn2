@@ -105,6 +105,12 @@ th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacin
 .qty-cell{color:#444;font-weight:500;font-size:13px;white-space:pre-line;text-align:right;padding-right:6px;line-height:1.6}
 .unit-cell{color:#666;font-size:13px;white-space:pre-line;line-height:1.6}
 .code-cell{font-family:'Courier New',monospace;font-size:12px;color:#777;white-space:pre-line;line-height:1.6}
+.tech-cell{vertical-align:middle}
+.tech-input{width:100%;padding:4px 6px;font-size:12px;font-family:'Sarabun',sans-serif;border:1px solid #ddd;border-radius:4px;background:#fafafa;color:#333}
+.tech-input:focus{outline:none;border-color:#1c1c1a;background:#fff}
+.tech-name{font-size:12px;color:#1c8c5e;font-weight:500}
+.mhdr-tech-input{padding:4px 8px;font-size:12px;font-family:'Sarabun',sans-serif;border:1px solid #bbb;border-radius:4px;background:#fff;color:#333;width:130px;margin-right:8px}
+.mhdr-tech-input:focus{outline:none;border-color:#1c1c1a}
 .dash{color:#ddd}
 .no-data{padding:3rem;text-align:center;color:#bbb;font-size:13px}
 /* Dashboard */
@@ -155,9 +161,8 @@ th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacin
 <div class="login-overlay" id="login-overlay">
   <div class="login-card">
     <div class="login-title">เข้าสู่ระบบ PM LMN2</div>
-    <div class="login-sub">กรอกชื่อช่าง และรหัสผ่านเพื่อเข้าใช้งาน</div>
-    <input type="text" class="login-input" id="login-input" placeholder="ชื่อช่าง เช่น ช่างA, นายสมชาย" autofocus />
-    <input type="password" class="login-input" id="login-pass" placeholder="รหัสผ่าน" />
+    <div class="login-sub">กรอกรหัสผ่านเพื่อเข้าใช้งาน</div>
+    <input type="password" class="login-input" id="login-pass" placeholder="รหัสผ่าน" autofocus />
     <div id="login-err" style="display:none;color:#d42020;font-size:11px;margin:-8px 0 10px">รหัสผ่านไม่ถูกต้อง</div>
     <button class="login-btn" id="login-btn">เริ่มใช้งาน</button>
   </div>
@@ -170,7 +175,7 @@ th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacin
       <div class="sb-sub" id="sb-counter">— เครื่อง · — งาน</div>
     </div>
     <div class="sb-user">
-      <span>ช่าง: <span class="sb-user-name" id="sb-user-name">—</span></span>
+      <span id="sb-user-name">เข้าสู่ระบบแล้ว</span>
       <span class="sb-logout" id="sb-logout">เปลี่ยน</span>
     </div>
     <div class="sb-search">
@@ -217,12 +222,13 @@ th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacin
         <table>
           <thead>
             <tr>
-              <th style="width:30%">รายการ PM</th>
-              <th style="width:8%">รอบ</th>
-              <th style="width:25%">อะไหล่</th>
+              <th style="width:28%">รายการ PM</th>
+              <th style="width:7%">รอบ</th>
+              <th style="width:22%">อะไหล่</th>
               <th style="width:6%">จำนวน</th>
               <th style="width:5%">หน่วย</th>
-              <th>Code</th>
+              <th style="width:10%">Code</th>
+              <th style="width:12%">ผู้ทำ</th>
             </tr>
           </thead>
           <tbody id="task-tbody"></tbody>
@@ -265,8 +271,8 @@ th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacin
 
 <script>
 /*** Supabase setup ***/
-const SUPA_URL = "https://dhjfmrmswgkufauhicsu.supabase.co";
-const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRoamZtcm1zd2drdWZhdWhpY3N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1NzgzNTQsImV4cCI6MjA5NDE1NDM1NH0.1_-VGOeK8hrU1jIEwi4_UFJoAbTP5lluX6OLaGpfhMw";
+const SUPA_URL = "https://idhvnggghjaerucihara.supabase.co";
+const SUPA_KEY = "sb_publishable_rW2Vg_ErVgwwZGKUAfmRtA_NfZPXVzt";
 const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
 /*** Master data (embedded) ***/
@@ -296,7 +302,6 @@ const STATE = {
   cycle: "",
   search: "",
   machineSearch: "",
-  technician: localStorage.getItem("pm_tech") || "",
   completions: {},   // key = `${task_id}_${year}_${month}` -> {id, technician}
   machineDone: {},   // key = `${machine_id}_${year}_${month}` -> {id, technician}
   yearStats: {},     // {month: {done, total}}
@@ -432,10 +437,11 @@ function renderTasks(){
     // Machine header row
     const hdr = document.createElement("tr");
     hdr.className = "machine-hdr" + (isMachineDone || allTasksDone ? " machine-done" : "");
-    hdr.innerHTML = `<td colspan="6"><div class="machine-hdr-inner">
+    hdr.innerHTML = `<td colspan="7"><div class="machine-hdr-inner">
       <span class="machine-name">${escapeHtml(m.n)}</span>
       <span class="chk-label">${doneTasks}/${tasks.length}</span>
       <div class="mhdr-spacer"></div>
+      <input class="mhdr-tech-input" data-machine="${m.i}" placeholder="ชื่อผู้ทำ..." maxlength="30" value="${escapeHtml(STATE.machineDone[machineDoneKey]?.technician||'')}">
       <div class="chk-wrap" data-machine="${m.i}" data-action="machine-toggle">
         <div class="chk-box ${isMachineDone ? "checked":""}">${isMachineDone?"✓":""}</div>
         <span class="chk-label">${isMachineDone ? "เครื่องนี้ PM เสร็จ" : "ทำเสร็จทั้งเครื่อง"}</span>
@@ -467,7 +473,11 @@ function renderTasks(){
         <td class="parts-cell">${partsHtml}</td>
         <td class="qty-cell">${qtyHtml}</td>
         <td class="unit-cell">${unitHtml}</td>
-        <td class="code-cell">${codeHtml}</td>`;
+        <td class="code-cell">${codeHtml}</td>
+        <td class="tech-cell">${isDone
+          ? `<span class="tech-name">${escapeHtml(STATE.completions[k].technician||'—')}</span>`
+          : ''
+        }</td>`;
       tbody.appendChild(tr);
     });
   });
@@ -484,6 +494,7 @@ function renderTasks(){
 
 /*** Click handlers for table ***/
 document.addEventListener("click", async (ev) => {
+  if (ev.target.classList.contains("mhdr-tech-input")) return; // don't trigger on input click
   const wrap = ev.target.closest(".chk-wrap");
   if (!wrap) return;
   const action = wrap.dataset.action;
@@ -503,14 +514,18 @@ async function toggleTask(taskId, el){
   const existing = STATE.completions[k];
   try {
     if (existing){
-      // Delete
       const { error } = await supa.from("pm_completions").delete().eq("id", existing.id);
       if (error) throw error;
       delete STATE.completions[k];
       showToast("ยกเลิกการเช็คงาน","ok");
     } else {
+      const tr = el.closest("tr");
+      let prev = tr?.previousElementSibling;
+      while (prev && !prev.classList.contains("machine-hdr")) prev = prev.previousElementSibling;
+      const techName = prev?.querySelector(".mhdr-tech-input")?.value.trim() || "";
       const { data, error } = await supa.from("pm_completions").insert({
-        task_id: taskId, year: STATE.yearCE, month: STATE.month, technician: STATE.technician, status: "done"
+        task_id: taskId, year: STATE.yearCE, month: STATE.month,
+        technician: techName, status: "done"
       }).select().single();
       if (error) throw error;
       STATE.completions[k] = data;
@@ -519,7 +534,8 @@ async function toggleTask(taskId, el){
     render();
   } catch(e){
     console.error(e);
-    showToast("เกิดข้อผิดพลาด: " + e.message, "err");
+    const msg = e?.message || JSON.stringify(e);
+    showToast("เกิดข้อผิดพลาด: " + msg, "err");
     box.classList.remove("loading");
   }
 }
@@ -534,15 +550,16 @@ async function toggleMachine(machineId, el){
       delete STATE.machineDone[k];
       showToast("ยกเลิก", "ok");
     } else {
+      const techName = document.querySelector(`.mhdr-tech-input[data-machine="${machineId}"]`)?.value.trim() || "";
       const { data, error } = await supa.from("pm_machine_done").insert({
-        machine_id: machineId, year: STATE.yearCE, month: STATE.month, technician: STATE.technician
+        machine_id: machineId, year: STATE.yearCE, month: STATE.month, technician: techName
       }).select().single();
       if (error) throw error;
       STATE.machineDone[k] = data;
       // Also mark all tasks for this machine this month as done
       const tasks = (tasksByMachine[machineId] || []).filter(t => t.ms.includes(STATE.month));
       const toInsert = tasks.filter(t => !STATE.completions[cKey(t.i, STATE.yearCE, STATE.month)])
-        .map(t => ({task_id: t.i, year: STATE.yearCE, month: STATE.month, technician: STATE.technician, status:"done"}));
+        .map(t => ({task_id: t.i, year: STATE.yearCE, month: STATE.month, technician: techName, status:"done"}));
       if (toInsert.length){
         const { data: ds, error: err2 } = await supa.from("pm_completions").upsert(toInsert, { onConflict: "task_id,year,month" }).select();
         if (err2) throw err2;
@@ -553,7 +570,8 @@ async function toggleMachine(machineId, el){
     render();
   } catch(e){
     console.error(e);
-    showToast("เกิดข้อผิดพลาด: " + e.message, "err");
+    const msg = e?.message || JSON.stringify(e);
+    showToast("เกิดข้อผิดพลาด: " + msg, "err");
   }
 }
 
@@ -573,10 +591,11 @@ async function loadCompletions(){
     document.getElementById("nav-status-text").textContent = "เชื่อมต่อแล้ว · ปี " + STATE.year;
     document.getElementById("nav-status").classList.remove("offline");
   } catch(e){
-    console.error(e);
+    console.error("loadCompletions error:", JSON.stringify(e), e);
     document.getElementById("nav-status-text").textContent = "ออฟไลน์";
     document.getElementById("nav-status").classList.add("offline");
-    showToast("โหลดข้อมูลไม่สำเร็จ", "err");
+    const msg = e?.message || e?.error_description || e?.hint || JSON.stringify(e);
+    showToast("โหลดไม่สำเร็จ: " + msg, "err");
   }
 }
 
@@ -693,17 +712,14 @@ document.getElementById("reset-filter").onclick = () => {
 const APP_PASSWORD = "lmn1234";
 function showLogin(){
   document.getElementById("login-overlay").classList.remove("hidden");
-  document.getElementById("login-input").value = STATE.technician || "";
   document.getElementById("login-pass").value = "";
   document.getElementById("login-err").style.display = "none";
-  document.getElementById("login-input").focus();
+  document.getElementById("login-pass").focus();
 }
 function hideLogin(){ document.getElementById("login-overlay").classList.add("hidden"); }
 function doLogin(){
-  const v = document.getElementById("login-input").value.trim();
   const p = document.getElementById("login-pass").value;
   const err = document.getElementById("login-err");
-  if (!v) { document.getElementById("login-input").focus(); return; }
   if (p !== APP_PASSWORD){
     err.textContent = "รหัสผ่านไม่ถูกต้อง";
     err.style.display = "block";
@@ -711,28 +727,23 @@ function doLogin(){
     document.getElementById("login-pass").select();
     return;
   }
-  STATE.technician = v;
-  localStorage.setItem("pm_tech", v);
   localStorage.setItem("pm_auth", "1");
-  document.getElementById("sb-user-name").textContent = v;
+  document.getElementById("sb-user-name").textContent = "เข้าสู่ระบบแล้ว";
   hideLogin();
   reload();
 }
 document.getElementById("login-btn").onclick = doLogin;
-document.getElementById("login-input").onkeydown = (e) => { if (e.key==="Enter") document.getElementById("login-pass").focus(); };
 document.getElementById("login-pass").onkeydown = (e) => { if (e.key==="Enter") doLogin(); };
 document.getElementById("sb-logout").onclick = () => {
   localStorage.removeItem("pm_auth");
-  localStorage.removeItem("pm_tech");
-  STATE.technician = "";
   showLogin();
 };
 
 /*** Init ***/
 initYearMonth();
 document.getElementById("sb-counter").textContent = `${MASTER.machines.length} เครื่อง · ${MASTER.tasks.length} งาน`;
-if (STATE.technician && localStorage.getItem("pm_auth") === "1"){
-  document.getElementById("sb-user-name").textContent = STATE.technician;
+if (localStorage.getItem("pm_auth") === "1"){
+  document.getElementById("sb-user-name").textContent = "เข้าสู่ระบบแล้ว";
   hideLogin();
   reload();
 } else {
